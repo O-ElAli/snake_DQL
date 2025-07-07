@@ -41,10 +41,17 @@ class SnakeEnv(gym.Env):
         self.done = False
 
     def reset(self, seed=None, options=None):
-        self._init_game()
-        if self.render_mode == "human":
-            self._render_frame()
-        return self._get_obs(), {}
+        super().reset(seed=seed)
+        self.snake = [(5, 5)]
+        self.direction = random.choice(self.DIRECTIONS)
+        self.score = 0
+        self.done = False
+        self.fruits = self._generate_fruits()
+        self.frame_count = 0
+
+        obs = self._get_obs()
+        return obs, {}
+
 
     def step(self, action):
         if self.done:
