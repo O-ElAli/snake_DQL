@@ -3,6 +3,7 @@ from gymnasium import spaces
 import numpy as np
 import pygame
 import random
+import cv2 
 
 class SnakeEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 10}
@@ -16,7 +17,7 @@ class SnakeEnv(gym.Env):
         self.snake_speed = 15
 
         self.action_space = spaces.Discrete(4)  # 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT
-        self.observation_space = spaces.Box(low=0, high=255, shape=(self.window_y, self.window_x, 3), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0, high=255, shape=(3, 84, 84), dtype=np.uint8)
 
         self.render_mode = render_mode
         self.window = None
@@ -107,8 +108,27 @@ class SnakeEnv(gym.Env):
         return self._get_obs(), reward, self.done, False, {}
 
     def _get_obs(self):
-        # Use a blank frame (just for placeholder)
-        return np.zeros((self.window_y, self.window_x, 3), dtype=np.uint8)
+        if self.window is None:
+            # Create a surface to render the game if window doesn't exist yet
+            surface = pygame.Surface((self.window_x, self.window_y))
+            surface.fill((0, 0, 0))
+            for pos in self.snake_body:
+                pygame.draw.rect(surface, (0, 255, 0), pygame.Rect(pos[0], pos[1], self.block_size, self.block_size))
+            pygame.draw.rect(surface, (255, 255, 255), pygame.Rect(self.fruit_position[0], self.fruit_position[1], self.block_size, self.block_size))
+        else:
+            surface = self.window  # if you have a pygame window, grab from it directly
+
+        # Get pixel data (shape: (width, height, channels))
+        frame = pygame.surfarray.array3d(surface)  # returns shape (width, height, 3)
+        frame = np.transpose(frame, (1, 0, 2))    # transpose to (height, width, 3) = (window_y, window_x, 3)
+
+        # Resize to 84x84 as expected by your model
+        small_frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA)
+
+        # Convert to channel-first (3, 84, 84) format for stable-baselines3
+        obs = np.transpose(small_frame, (2, 0, 1))
+
+        return obs
 
     def _render_frame(self):
         if self.window is None:
