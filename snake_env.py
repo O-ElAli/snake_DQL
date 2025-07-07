@@ -58,6 +58,9 @@ class SnakeEnv(gym.Env):
         if self.done:
             return self._get_obs(), 0, True, False, {}
 
+        # Calculate distance before moving
+        prev_distance = np.linalg.norm(np.array(self.snake_position) - np.array(self.fruit_position))
+
         # Update direction
         if action == 0 and self.direction != 'DOWN':
             self.direction = 'UP'
@@ -83,9 +86,15 @@ class SnakeEnv(gym.Env):
 
         reward = 0
 
+        # Calculate distance after moving
+        new_distance = np.linalg.norm(np.array([x, y]) - np.array(self.fruit_position))
+
+        # Reward shaping: encourage moving closer to fruit
+        reward += (prev_distance - new_distance) * 0.2  # small positive if closer, negative if farther
+
         # Check for fruit collection
         if self.snake_position == self.fruit_position:
-            reward = 10
+            reward += 10
             self.score += 10
             self.fruit_index += 1
             if self.fruit_index < len(self.fruits):

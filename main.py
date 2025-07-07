@@ -9,10 +9,10 @@ def train():
     env = Monitor(SnakeEnv(render_mode=None))
 
     model = DQN("CnnPolicy", env, verbose=1, learning_rate=1e-3,
-                buffer_size=50000, learning_starts=1000, batch_size=32, target_update_interval=500)
+                buffer_size=50000, learning_starts=1000, batch_size=64, target_update_interval=500)
 
-    model.learn(total_timesteps=100000)
-    model.save("dqn_snake")
+    model.learn(total_timesteps=500000)
+    model.save("dqn_snake.zip")
 
     mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10)
     print(f"Mean reward: {mean_reward} +/- {std_reward}")
@@ -20,7 +20,7 @@ def train():
     env.close()
 
 def test():
-    model = DQN.load("dqn_snake")
+    model = DQN.load("dqn_snake.zip")
     env = Monitor(SnakeEnv(render_mode="human"))
     obs, info = env.reset()
     done = False
