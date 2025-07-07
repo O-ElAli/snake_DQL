@@ -43,10 +43,10 @@ class SnakeEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.snake = [(5, 5)]
-        self.direction = random.choice(self.DIRECTIONS)
+        self.direction = random.choice(['UP', 'DOWN', 'LEFT', 'RIGHT'])
         self.score = 0
         self.done = False
-        self.fruits = self._generate_fruits()
+        self._init_game()
         self.frame_count = 0
 
         obs = self._get_obs()
