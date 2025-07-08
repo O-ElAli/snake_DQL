@@ -58,7 +58,6 @@ class SnakeEnv(gym.Env):
         if self.done:
             return self._get_obs(), 0, True, False, {}
 
-        # Calculate distance before moving
         prev_distance = np.linalg.norm(np.array(self.snake_position) - np.array(self.fruit_position))
 
         # Update direction
@@ -84,15 +83,20 @@ class SnakeEnv(gym.Env):
         self.snake_position = [x, y]
         self.snake_body.insert(0, list(self.snake_position))
 
-        reward = 0
+        reward = 0.1  # baseline reward per step (encourages survival)
 
-        # Calculate distance after moving
         new_distance = np.linalg.norm(np.array([x, y]) - np.array(self.fruit_position))
+        reward += (prev_distance - new_distance) * 0.2  # reward for getting closer to fruit
 
-        # Reward shaping: encourage moving closer to fruit
-        reward += (prev_distance - new_distance) * 0.2  # small positive if closer, negative if farther
+        # === New Tail-Safety Penalty ===
+        # Encourage not getting too close to self
+        for body_segment in self.snake_body[1:]:
+            dist = np.linalg.norm(np.array(self.snake_position) - np.array(body_segment))
+            if dist < self.block_size * 1.5:
+                reward -= 0.3  # small penalty for dangerous proximity
+                break
 
-        # Check for fruit collection
+        # === Fruit Collection ===
         if self.snake_position == self.fruit_position:
             reward += 10
             self.score += 10
@@ -104,7 +108,7 @@ class SnakeEnv(gym.Env):
         else:
             self.snake_body.pop()
 
-        # Check collision
+        # === Collision Detection ===
         if (x < 0 or x >= self.window_x or
             y < 0 or y >= self.window_y or
             self.snake_position in self.snake_body[1:]):
@@ -115,6 +119,7 @@ class SnakeEnv(gym.Env):
             self._render_frame()
 
         return self._get_obs(), reward, self.done, False, {}
+
 
     def _get_obs(self):
         if self.window is None:
