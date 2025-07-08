@@ -3,7 +3,6 @@ from gymnasium import spaces
 import numpy as np
 import pygame
 import random
-import cv2 
 
 class SnakeEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 10}
@@ -17,7 +16,9 @@ class SnakeEnv(gym.Env):
         self.snake_speed = 15
 
         self.action_space = spaces.Discrete(4)  # 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT
-        self.observation_space = spaces.Box(low=0, high=255, shape=(3, 84, 84), dtype=np.uint8)
+
+        # Observation: [snake_x, snake_y, fruit_x, fruit_y, delta_x, delta_y, dir_up, dir_down, dir_left, dir_right, danger]
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(11,), dtype=np.float32)
 
         self.render_mode = render_mode
         self.window = None
@@ -37,22 +38,15 @@ class SnakeEnv(gym.Env):
             [300, 50],  [600, 150], [200, 50]
         ]
         self.fruit_position = self.fruits[self.fruit_index]
-        self.direction = 'RIGHT'
+        self.direction = random.choice(['UP', 'DOWN', 'LEFT', 'RIGHT'])
         self.score = 0
         self.done = False
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        self.snake = [(5, 5)]
-        self.direction = random.choice(['UP', 'DOWN', 'LEFT', 'RIGHT'])
-        self.score = 0
-        self.done = False
         self._init_game()
         self.frame_count = 0
-
-        obs = self._get_obs()
-        return obs, {}
-
+        return self._get_obs(), {}
 
     def step(self, action):
         if self.done:
@@ -83,20 +77,20 @@ class SnakeEnv(gym.Env):
         self.snake_position = [x, y]
         self.snake_body.insert(0, list(self.snake_position))
 
-        reward = 0.1  # baseline reward per step (encourages survival)
+        reward = 0.1  # base reward
 
+        # Distance improvement
         new_distance = np.linalg.norm(np.array([x, y]) - np.array(self.fruit_position))
-        reward += (prev_distance - new_distance) * 0.2  # reward for getting closer to fruit
+        reward += (prev_distance - new_distance) * 0.2
 
-        # === New Tail-Safety Penalty ===
-        # Encourage not getting too close to self
+        # Tail proximity penalty
         for body_segment in self.snake_body[1:]:
             dist = np.linalg.norm(np.array(self.snake_position) - np.array(body_segment))
             if dist < self.block_size * 1.5:
-                reward -= 0.3  # small penalty for dangerous proximity
+                reward -= 0.3
                 break
 
-        # === Fruit Collection ===
+        # Eat fruit
         if self.snake_position == self.fruit_position:
             reward += 10
             self.score += 10
@@ -108,7 +102,7 @@ class SnakeEnv(gym.Env):
         else:
             self.snake_body.pop()
 
-        # === Collision Detection ===
+        # Collision
         if (x < 0 or x >= self.window_x or
             y < 0 or y >= self.window_y or
             self.snake_position in self.snake_body[1:]):
@@ -120,29 +114,53 @@ class SnakeEnv(gym.Env):
 
         return self._get_obs(), reward, self.done, False, {}
 
-
     def _get_obs(self):
-        if self.window is None:
-            # Create a surface to render the game if window doesn't exist yet
-            surface = pygame.Surface((self.window_x, self.window_y))
-            surface.fill((0, 0, 0))
-            for pos in self.snake_body:
-                pygame.draw.rect(surface, (0, 255, 0), pygame.Rect(pos[0], pos[1], self.block_size, self.block_size))
-            pygame.draw.rect(surface, (255, 255, 255), pygame.Rect(self.fruit_position[0], self.fruit_position[1], self.block_size, self.block_size))
-        else:
-            surface = self.window  # if you have a pygame window, grab from it directly
+        x, y = self.snake_position
+        fx, fy = self.fruit_position
 
-        # Get pixel data (shape: (width, height, channels))
-        frame = pygame.surfarray.array3d(surface)  # returns shape (width, height, 3)
-        frame = np.transpose(frame, (1, 0, 2))    # transpose to (height, width, 3) = (window_y, window_x, 3)
+        # Normalize by window size
+        norm = lambda v, max_v: v / max_v
+        delta_x = norm(fx - x, self.window_x)
+        delta_y = norm(fy - y, self.window_y)
 
-        # Resize to 84x84 as expected by your model
-        small_frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA)
+        dir_up = int(self.direction == 'UP')
+        dir_down = int(self.direction == 'DOWN')
+        dir_left = int(self.direction == 'LEFT')
+        dir_right = int(self.direction == 'RIGHT')
 
-        # Convert to channel-first (3, 84, 84) format for stable-baselines3
-        obs = np.transpose(small_frame, (2, 0, 1))
+        # Danger straight ahead?
+        ahead = self._get_next_position()
+        danger = 0
+        if (ahead[0] < 0 or ahead[0] >= self.window_x or
+            ahead[1] < 0 or ahead[1] >= self.window_y or
+            ahead in self.snake_body):
+            danger = 1
 
-        return obs
+        return np.array([
+            norm(x, self.window_x),
+            norm(y, self.window_y),
+            norm(fx, self.window_x),
+            norm(fy, self.window_y),
+            delta_x,
+            delta_y,
+            dir_up,
+            dir_down,
+            dir_left,
+            dir_right,
+            danger
+        ], dtype=np.float32)
+
+    def _get_next_position(self):
+        x, y = self.snake_position
+        if self.direction == 'UP':
+            y -= self.block_size
+        elif self.direction == 'DOWN':
+            y += self.block_size
+        elif self.direction == 'LEFT':
+            x -= self.block_size
+        elif self.direction == 'RIGHT':
+            x += self.block_size
+        return [x, y]
 
     def _render_frame(self):
         if self.window is None:

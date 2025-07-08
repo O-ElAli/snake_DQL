@@ -5,10 +5,8 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
 from snake_env import SnakeEnv
 
-
 MODEL_PATH = "dqn_snake"
-
-timestamps = 50000  # Default total timesteps for training
+timestamps = 500000  # Default total timesteps for training
 
 def train(total_timesteps=timestamps):
     env = Monitor(SnakeEnv(render_mode=None))
@@ -18,7 +16,7 @@ def train(total_timesteps=timestamps):
         model = DQN.load(MODEL_PATH, env=env)
     else:
         print("🆕 No saved model found — starting fresh training...")
-        model = DQN("CnnPolicy", env, verbose=1, learning_rate=1e-3,
+        model = DQN("MlpPolicy", env, verbose=1, learning_rate=1e-3,
                     buffer_size=50000, learning_starts=1000,
                     batch_size=64, target_update_interval=500)
 
@@ -29,7 +27,6 @@ def train(total_timesteps=timestamps):
     print(f"📊 Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}")
 
     env.close()
-
 
 def test():
     if not os.path.exists(MODEL_PATH + ".zip"):
@@ -47,7 +44,6 @@ def test():
         env.render()
 
     env.close()
-
 
 if __name__ == "__main__":
     train(total_timesteps=timestamps)
