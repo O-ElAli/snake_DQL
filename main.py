@@ -28,22 +28,21 @@ def train(total_timesteps=timestamps):
 
     env.close()
 
-def test():
-    if not os.path.exists(MODEL_PATH + ".zip"):
-        print("No trained model found. Train the model first.")
-        return
+    def test():
+        if not os.path.exists(MODEL_PATH + ".zip"):
+            print("No trained model found. Train the model first.")
+            return
 
-    model = DQN.load(MODEL_PATH)
-    env = Monitor(SnakeEnv(render_mode="human"))
+        model = DQN.load(MODEL_PATH)
+        env = Monitor(SnakeEnv(render_mode="human"))  # Rendering is handled internally here
 
-    obs, info = env.reset()
-    done = False
-    while not done:
-        action, _ = model.predict(obs)
-        obs, reward, done, truncated, info = env.step(action)
-        env.render()
+        obs, info = env.reset()
+        done = False
+        while not done:
+            action, _ = model.predict(obs)
+            obs, reward, done, truncated, info = env.step(action)
 
-    env.close()
+        env.close()
 
 if __name__ == "__main__":
     train(total_timesteps=timestamps)
