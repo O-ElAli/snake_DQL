@@ -4,6 +4,7 @@ import numpy as np
 import pygame
 import random
 
+
 class SnakeEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 10}
 
@@ -16,8 +17,6 @@ class SnakeEnv(gym.Env):
         self.snake_speed = 15
 
         self.action_space = spaces.Discrete(4)  # 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT
-
-        # Observation: [snake_x, snake_y, fruit_x, fruit_y, delta_x, delta_y, dir_up, dir_down, dir_left, dir_right, danger]
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(11,), dtype=np.float32)
 
         self.render_mode = render_mode
@@ -31,12 +30,12 @@ class SnakeEnv(gym.Env):
         self.snake_body = [[100, 50], [90, 50], [80, 50]]
         self.fruit_index = 0
         self.fruits = [
-            [100, 100], [300, 150], [500, 100],
-            [200, 250], [400, 200], [600, 300],
-            [150, 350], [350, 300], [550, 250],
-            [100, 400], [250, 150], [450, 350],
-            [300, 50],  [600, 150], [200, 50]
+            [120, 60], [400, 100], [680, 300], [220, 440], [500, 200],
+            [320, 360], [100, 300], [600, 140], [240, 180], [420, 400],
+            [300, 240], [150, 120], [540, 360], [180, 60], [360, 300],
+            [640, 220], [280, 80], [460, 160], [200, 320], [580, 260]
         ]
+
         self.fruit_position = self.fruits[self.fruit_index]
         self.direction = random.choice(['UP', 'DOWN', 'LEFT', 'RIGHT'])
         self.score = 0
@@ -87,7 +86,9 @@ class SnakeEnv(gym.Env):
         for body_segment in self.snake_body[1:]:
             dist = np.linalg.norm(np.array(self.snake_position) - np.array(body_segment))
             if dist < self.block_size * 1.5:
-                reward -= 0.3
+                reward -= 0.5
+                if dist < self.block_size * 0.9:
+                    reward -= 1.0
                 break
 
         # Eat fruit
@@ -118,8 +119,10 @@ class SnakeEnv(gym.Env):
         x, y = self.snake_position
         fx, fy = self.fruit_position
 
-        # Normalize by window size
-        norm = lambda v, max_v: v / max_v
+        # Normalize function
+        def norm(v, max_v):
+            return v / max_v
+
         delta_x = norm(fx - x, self.window_x)
         delta_y = norm(fy - y, self.window_y)
 
@@ -128,7 +131,7 @@ class SnakeEnv(gym.Env):
         dir_left = int(self.direction == 'LEFT')
         dir_right = int(self.direction == 'RIGHT')
 
-        # Danger straight ahead?
+        # Danger straight ahead
         ahead = self._get_next_position()
         danger = 0
         if (ahead[0] < 0 or ahead[0] >= self.window_x or
@@ -171,15 +174,24 @@ class SnakeEnv(gym.Env):
             self.clock = pygame.time.Clock()
 
         self.window.fill((0, 0, 0))
+
         for pos in self.snake_body:
-            pygame.draw.rect(self.window, (0, 255, 0), pygame.Rect(pos[0], pos[1], self.block_size, self.block_size))
-        pygame.draw.rect(self.window, (255, 255, 255), pygame.Rect(self.fruit_position[0], self.fruit_position[1], self.block_size, self.block_size))
+            pygame.draw.rect(self.window, (0, 255, 0),
+                             pygame.Rect(pos[0], pos[1], self.block_size, self.block_size))
+
+        pygame.draw.rect(self.window, (255, 255, 255),
+                         pygame.Rect(self.fruit_position[0], self.fruit_position[1],
+                                     self.block_size, self.block_size))
+
+        font = pygame.font.SysFont('Arial', 20)
+        apple_text = font.render(f'Apples: {self.score // 10}', True, (255, 255, 255))
+        self.window.blit(apple_text, (10, 10))
+
         pygame.display.flip()
         self.clock.tick(self.snake_speed)
-
-    def render(self):
-        self._render_frame()
 
     def close(self):
         if self.window is not None:
             pygame.quit()
+            self.window = None
+            self.clock = None

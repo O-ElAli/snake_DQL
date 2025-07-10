@@ -1,7 +1,7 @@
 import time
 from snake_env import SnakeEnv
 from stable_baselines3 import DQN
-
+from stable_baselines3 import PPO
 # Load environment with rendering enabled
 env = SnakeEnv(render_mode="human")
 
