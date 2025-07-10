@@ -17,7 +17,7 @@ class SnakeEnv(gym.Env):
         self.snake_speed = 15
 
         self.action_space = spaces.Discrete(4)  # 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT
-        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(11,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(14,), dtype=np.float32)
 
         self.render_mode = render_mode
         self.window = None
@@ -32,16 +32,27 @@ class SnakeEnv(gym.Env):
         self.direction = random.choice(['UP', 'DOWN', 'LEFT', 'RIGHT'])
         self.score = 0
         self.done = False
-        self.steps_in_episode = 0  # Track episode length
+        self.steps_in_episode = 0
+
+        self.obstacles = self._generate_obstacles(num=10)
 
     def _generate_fruit_position(self):
-        """Generate random fruit position not occupied by snake"""
         while True:
             x = random.randrange(0, self.window_x, self.block_size)
             y = random.randrange(0, self.window_y, self.block_size)
-            fruit_pos = [x, y]
-            if fruit_pos not in self.snake_body:
-                return fruit_pos
+            pos = [x, y]
+            if pos not in self.snake_body and pos not in self.obstacles:
+                return pos
+
+    def _generate_obstacles(self, num=10):
+        obstacles = []
+        while len(obstacles) < num:
+            x = random.randrange(0, self.window_x, self.block_size)
+            y = random.randrange(0, self.window_y, self.block_size)
+            pos = [x, y]
+            if pos not in self.snake_body:
+                obstacles.append(pos)
+        return obstacles
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -80,13 +91,11 @@ class SnakeEnv(gym.Env):
         self.snake_position = [x, y]
         self.snake_body.insert(0, list(self.snake_position))
 
-        reward = 0.1  # base reward
+        reward = 0.1
 
-        # Distance improvement reward
         new_distance = np.linalg.norm(np.array([x, y]) - np.array(self.fruit_position))
         reward += (prev_distance - new_distance) * 0.2
 
-        # Tail proximity penalty
         for body_segment in self.snake_body[1:]:
             dist = np.linalg.norm(np.array(self.snake_position) - np.array(body_segment))
             if dist < self.block_size * 1.5:
@@ -95,7 +104,6 @@ class SnakeEnv(gym.Env):
                     reward -= 1.0
                 break
 
-        # Eat fruit
         if self.snake_position == self.fruit_position:
             reward += 10
             self.score += 10
@@ -104,14 +112,13 @@ class SnakeEnv(gym.Env):
             if len(self.snake_body) > 1:
                 self.snake_body.pop()
 
-        # Collision detection
         if (x < 0 or x >= self.window_x or
             y < 0 or y >= self.window_y or
-            self.snake_position in self.snake_body[1:]):
+            self.snake_position in self.snake_body[1:] or
+            self.snake_position in self.obstacles):
             reward = -100
             self.done = True
 
-        # Max step limit to avoid freezing
         if self.steps_in_episode > 1000:
             self.done = True
             print("⚠️ Episode terminated due to step limit.")
@@ -137,11 +144,20 @@ class SnakeEnv(gym.Env):
         dir_right = int(self.direction == 'RIGHT')
 
         ahead = self._get_next_position()
-        danger = 0
-        if (ahead[0] < 0 or ahead[0] >= self.window_x or
-            ahead[1] < 0 or ahead[1] >= self.window_y or
-            ahead in self.snake_body):
-            danger = 1
+        left = self._get_next_position_from_direction("LEFT")
+        right = self._get_next_position_from_direction("RIGHT")
+
+        def is_danger(pos):
+            return (
+                pos[0] < 0 or pos[0] >= self.window_x or
+                pos[1] < 0 or pos[1] >= self.window_y or
+                pos in self.snake_body or
+                pos in self.obstacles
+            )
+
+        danger_ahead = int(is_danger(ahead))
+        danger_left = int(is_danger(left))
+        danger_right = int(is_danger(right))
 
         return np.array([
             norm(x, self.window_x),
@@ -154,18 +170,30 @@ class SnakeEnv(gym.Env):
             dir_down,
             dir_left,
             dir_right,
-            danger
+            danger_ahead,
+            danger_left,
+            danger_right
         ], dtype=np.float32)
 
     def _get_next_position(self):
+        return self._get_next_position_from_direction("FORWARD")
+
+    def _get_next_position_from_direction(self, turn):
+        direction_map = {
+            'UP': {'LEFT': 'LEFT', 'RIGHT': 'RIGHT', 'FORWARD': 'UP'},
+            'DOWN': {'LEFT': 'RIGHT', 'RIGHT': 'LEFT', 'FORWARD': 'DOWN'},
+            'LEFT': {'LEFT': 'DOWN', 'RIGHT': 'UP', 'FORWARD': 'LEFT'},
+            'RIGHT': {'LEFT': 'UP', 'RIGHT': 'DOWN', 'FORWARD': 'RIGHT'}
+        }
+        new_dir = direction_map[self.direction][turn]
         x, y = self.snake_position
-        if self.direction == 'UP':
+        if new_dir == 'UP':
             y -= self.block_size
-        elif self.direction == 'DOWN':
+        elif new_dir == 'DOWN':
             y += self.block_size
-        elif self.direction == 'LEFT':
+        elif new_dir == 'LEFT':
             x -= self.block_size
-        elif self.direction == 'RIGHT':
+        elif new_dir == 'RIGHT':
             x += self.block_size
         return [x, y]
 
@@ -186,6 +214,10 @@ class SnakeEnv(gym.Env):
         pygame.draw.rect(self.window, (255, 255, 255),
                          pygame.Rect(self.fruit_position[0], self.fruit_position[1],
                                      self.block_size, self.block_size))
+
+        for pos in self.obstacles:
+            pygame.draw.rect(self.window, (139, 69, 19),
+                             pygame.Rect(pos[0], pos[1], self.block_size, self.block_size))
 
         font = pygame.font.SysFont('Arial', 20)
         apple_text = font.render(f'Apples: {self.score // 10}', True, (255, 255, 255))
