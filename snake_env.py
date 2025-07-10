@@ -28,18 +28,20 @@ class SnakeEnv(gym.Env):
     def _init_game(self):
         self.snake_position = [100, 50]
         self.snake_body = [[100, 50], [90, 50], [80, 50]]
-        self.fruit_index = 0
-        self.fruits = [
-            [120, 60], [400, 100], [680, 300], [220, 440], [500, 200],
-            [320, 360], [100, 300], [600, 140], [240, 180], [420, 400],
-            [300, 240], [150, 120], [540, 360], [180, 60], [360, 300],
-            [640, 220], [280, 80], [460, 160], [200, 320], [580, 260]
-        ]
-
-        self.fruit_position = self.fruits[self.fruit_index]
+        self.fruit_position = self._generate_fruit_position()
         self.direction = random.choice(['UP', 'DOWN', 'LEFT', 'RIGHT'])
         self.score = 0
         self.done = False
+        self.steps_in_episode = 0  # Track episode length
+
+    def _generate_fruit_position(self):
+        """Generate random fruit position not occupied by snake"""
+        while True:
+            x = random.randrange(0, self.window_x, self.block_size)
+            y = random.randrange(0, self.window_y, self.block_size)
+            fruit_pos = [x, y]
+            if fruit_pos not in self.snake_body:
+                return fruit_pos
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -50,6 +52,8 @@ class SnakeEnv(gym.Env):
     def step(self, action):
         if self.done:
             return self._get_obs(), 0, True, False, {}
+
+        self.steps_in_episode += 1
 
         prev_distance = np.linalg.norm(np.array(self.snake_position) - np.array(self.fruit_position))
 
@@ -78,7 +82,7 @@ class SnakeEnv(gym.Env):
 
         reward = 0.1  # base reward
 
-        # Distance improvement
+        # Distance improvement reward
         new_distance = np.linalg.norm(np.array([x, y]) - np.array(self.fruit_position))
         reward += (prev_distance - new_distance) * 0.2
 
@@ -95,20 +99,22 @@ class SnakeEnv(gym.Env):
         if self.snake_position == self.fruit_position:
             reward += 10
             self.score += 10
-            self.fruit_index += 1
-            if self.fruit_index < len(self.fruits):
-                self.fruit_position = self.fruits[self.fruit_index]
-            else:
-                self.done = True
+            self.fruit_position = self._generate_fruit_position()
         else:
-            self.snake_body.pop()
+            if len(self.snake_body) > 1:
+                self.snake_body.pop()
 
-        # Collision
+        # Collision detection
         if (x < 0 or x >= self.window_x or
             y < 0 or y >= self.window_y or
             self.snake_position in self.snake_body[1:]):
             reward = -100
             self.done = True
+
+        # Max step limit to avoid freezing
+        if self.steps_in_episode > 1000:
+            self.done = True
+            print("⚠️ Episode terminated due to step limit.")
 
         if self.render_mode == "human":
             self._render_frame()
@@ -119,7 +125,6 @@ class SnakeEnv(gym.Env):
         x, y = self.snake_position
         fx, fy = self.fruit_position
 
-        # Normalize function
         def norm(v, max_v):
             return v / max_v
 
@@ -131,7 +136,6 @@ class SnakeEnv(gym.Env):
         dir_left = int(self.direction == 'LEFT')
         dir_right = int(self.direction == 'RIGHT')
 
-        # Danger straight ahead
         ahead = self._get_next_position()
         danger = 0
         if (ahead[0] < 0 or ahead[0] >= self.window_x or
