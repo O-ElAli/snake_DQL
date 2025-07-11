@@ -17,7 +17,7 @@ class SnakeEnv(gym.Env):
         self.snake_speed = 15
 
         self.action_space = spaces.Discrete(4)  # 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT
-        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(14,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(13,), dtype=np.float32)
 
         self.render_mode = render_mode
         self.window = None
@@ -28,13 +28,14 @@ class SnakeEnv(gym.Env):
     def _init_game(self):
         self.snake_position = [100, 50]
         self.snake_body = [[100, 50], [90, 50], [80, 50]]
-        self.fruit_position = self._generate_fruit_position()
         self.direction = random.choice(['UP', 'DOWN', 'LEFT', 'RIGHT'])
         self.score = 0
         self.done = False
         self.steps_in_episode = 0
 
         self.obstacles = self._generate_obstacles(num=10)
+        self.fruit_position = self._generate_fruit_position()
+
 
     def _generate_fruit_position(self):
         while True:
