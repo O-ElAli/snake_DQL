@@ -122,7 +122,7 @@ class SnakeEnv(gym.Env):
 
         if self.steps_in_episode > 1000:
             self.done = True
-            print("⚠️ Episode terminated due to step limit.")
+            print("!!!!!! Episode terminated due to step limit. !!!!!!")
 
         if self.render_mode == "human":
             self._render_frame()

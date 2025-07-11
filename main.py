@@ -12,10 +12,10 @@ def train(total_timesteps=timestamps):
     env = Monitor(SnakeEnv(render_mode=None))
 
     if os.path.exists(MODEL_PATH + ".zip"):
-        print("🔄 Found saved model — resuming training...")
+        print("Found saved model — resuming training...")
         model = DQN.load(MODEL_PATH, env=env)
     else:
-        print("🆕 No saved model found — starting fresh training...")
+        print("No saved model found — starting fresh training...")
         model = DQN("MlpPolicy", env, verbose=1, learning_rate=1e-3,
                     buffer_size=50000, learning_starts=1000,
                     batch_size=64, target_update_interval=500)
@@ -24,7 +24,7 @@ def train(total_timesteps=timestamps):
     model.save(MODEL_PATH)
 
     mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10)
-    print(f"📊 Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}")
+    print(f"Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}")
 
     env.close()
 
