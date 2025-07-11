@@ -6,7 +6,7 @@ from stable_baselines3.common.monitor import Monitor
 from snake_env import SnakeEnv
 
 MODEL_PATH = "dqn_snake"
-timestamps = 1000000  # Default total timesteps for training
+timestamps = 2000000  # Default total timesteps for training
 
 def train(total_timesteps=timestamps):
     env = Monitor(SnakeEnv(render_mode=None))
